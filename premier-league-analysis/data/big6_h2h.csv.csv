@@ -1,0 +1,31 @@
+"Team","Opponent","Played","Wins","Draws","Losses"
+Arsenal,Chelsea,7,5,0,2
+Arsenal,Liverpool,7,3,2,2
+Arsenal,Man City,7,2,0,5
+Arsenal,Man United,7,6,1,0
+Arsenal,Tottenham,7,5,2,0
+Chelsea,Arsenal,7,1,3,3
+Chelsea,Liverpool,7,1,4,2
+Chelsea,Man City,7,2,1,4
+Chelsea,Man United,7,2,4,1
+Chelsea,Tottenham,7,5,2,0
+Liverpool,Arsenal,7,4,3,0
+Liverpool,Chelsea,7,4,2,1
+Liverpool,Man City,7,3,3,1
+Liverpool,Man United,7,4,3,0
+Liverpool,Tottenham,7,6,1,0
+Man City,Arsenal,7,5,2,0
+Man City,Chelsea,7,5,1,1
+Man City,Liverpool,7,3,3,1
+Man City,Man United,7,4,0,3
+Man City,Tottenham,7,3,2,2
+Man United,Arsenal,7,2,3,2
+Man United,Chelsea,7,3,4,0
+Man United,Liverpool,7,1,3,3
+Man United,Man City,7,2,2,3
+Man United,Tottenham,7,3,1,3
+Tottenham,Arsenal,7,3,1,3
+Tottenham,Chelsea,7,2,0,5
+Tottenham,Liverpool,7,1,1,5
+Tottenham,Man City,7,4,0,3
+Tottenham,Man United,7,2,2,3

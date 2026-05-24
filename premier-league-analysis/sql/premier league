@@ -1,0 +1,575 @@
+========================================================
+---PREMIER LEAGUE ANALYSIS---
+========================================================
+--===========VERIFY TOTAL NUMBER OF MATCHES=============
+SELECT COUNT(*) FROM matches;
+
+--=======SEE FIRST 5 ROWS & COLUMNS=====================
+SELECT * FROM matches LIMIT 5;
+
+--===========YEAR DISTRIBUTION CHECK====================
+SELECT 
+    SUBSTR(Date, 7, 4) AS Year,
+    COUNT(*) AS Matches
+FROM matches
+GROUP BY Year
+ORDER BY Year;
+
+--===========DUPLICATE DETECTION=========================
+SELECT 
+    Date, 
+    HomeTeam, 
+    AwayTeam, 
+    COUNT(*) AS DuplicateCount
+FROM matches
+GROUP BY Date, HomeTeam, AwayTeam
+HAVING COUNT(*) > 1;
+
+--===========SURGICAL DEDUPLICATION======================
+DELETE FROM matches
+WHERE rowid NOT IN (
+    SELECT MIN(rowid)
+    FROM matches
+    GROUP BY Date, HomeTeam, AwayTeam
+);
+
+--===========FINAL VERIFICATION==========================
+SELECT COUNT(*) FROM matches;
+
+--===========HOME MATCHES================================
+WITH HomeMatches AS (
+    SELECT 
+        HomeTeam AS Team,
+        COUNT(*) AS MatchesPlayed,
+        SUM(FTHG) AS GoalsScored,
+        SUM(FTAG) AS GoalsConceded,
+        SUM(CASE 
+            WHEN FTR = 'H' THEN 3 
+            WHEN FTR = 'D' THEN 1 
+            ELSE 0 
+        END) AS HomePoints
+    FROM matches
+    GROUP BY HomeTeam
+)
+SELECT * FROM HomeMatches ORDER BY HomePoints DESC;
+
+--==================AWAY MATCHES=======================
+WITH AwayMatches AS (
+    SELECT 
+        AwayTeam AS Team,
+        COUNT(*) AS MatchesPlayed,
+        SUM(FTAG) AS GoalsScored,
+        SUM(FTHG) AS GoalsConceded,
+        SUM(CASE 
+            WHEN FTR = 'A' THEN 3 
+            WHEN FTR = 'D' THEN 1 
+            ELSE 0 
+        END) AS AwayPoints
+    FROM matches
+    GROUP BY AwayTeam
+)
+SELECT * FROM AwayMatches ORDER BY AwayPoints DESC;
+
+--=========THE HOME ADVANTAGE======================================
+SELECT 
+    COUNT(*) AS TotalMatches,
+    SUM(CASE WHEN FTR = 'H' THEN 1 ELSE 0 END) AS HomeWins,
+    SUM(CASE WHEN FTR = 'A' THEN 1 ELSE 0 END) AS AwayWins,
+    SUM(CASE WHEN FTR = 'D' THEN 1 ELSE 0 END) AS Draws,
+    
+    -- CALCULATE PERCENTAGES (CAST TO FLOAT TO ALLOW DECIMALS IN SQLITE)
+    ROUND(CAST(SUM(CASE WHEN FTR = 'H' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100, 2) AS HomeWinPct,
+    ROUND(CAST(SUM(CASE WHEN FTR = 'A' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100, 2) AS AwayWinPct,
+    ROUND(CAST(SUM(CASE WHEN FTR = 'D' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100, 2) AS DrawPct
+FROM matches;
+
+--=========THE HOME ADVANTAGE DELTA (PER TEAM)====================
+WITH TeamHomeStats AS (
+    SELECT 
+        HomeTeam AS Team,
+        COUNT(*) AS HomeMatches,
+        SUM(CASE WHEN FTR = 'H' THEN 1 ELSE 0 END) AS HomeWins,
+        ROUND(CAST(SUM(CASE WHEN FTR = 'H' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100, 2) AS HomeWinPct
+    FROM matches
+    GROUP BY HomeTeam
+),
+TeamAwayStats AS (
+    SELECT 
+        AwayTeam AS Team,
+        COUNT(*) AS AwayMatches,
+        SUM(CASE WHEN FTR = 'A' THEN 1 ELSE 0 END) AS AwayWins,
+        ROUND(CAST(SUM(CASE WHEN FTR = 'A' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100, 2) AS AwayWinPct
+    FROM matches
+    GROUP BY AwayTeam
+)
+SELECT 
+    H.Team,
+    H.HomeWinPct,
+    A.AwayWinPct,
+    ROUND((H.HomeWinPct - A.AwayWinPct), 2) AS HomeAdvantageDelta
+FROM TeamHomeStats H
+JOIN TeamAwayStats A ON H.Team = A.Team
+ORDER BY HomeAdvantageDelta DESC;
+
+--==================HOME ADVANTAGE QUANTIFICATION===========================
+SELECT 
+    COUNT(*) AS TotalMatches,
+    SUM(CASE WHEN FTR = 'H' THEN 1 ELSE 0 END) AS HomeWins,
+    SUM(CASE WHEN FTR = 'D' THEN 1 ELSE 0 END) AS Draws,
+    SUM(CASE WHEN FTR = 'A' THEN 1 ELSE 0 END) AS AwayWins,
+    ROUND(SUM(CASE WHEN FTR = 'H' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS HomeWinPct,
+    ROUND(SUM(CASE WHEN FTR = 'D' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS DrawPct,
+    ROUND(SUM(CASE WHEN FTR = 'A' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS AwayWinPct
+FROM matches;
+
+--======GOALS SCORED AT HOME VS AWAY========================================
+SELECT 
+    ROUND(AVG(FTHG), 2) AS AvgHomeGoals,
+    ROUND(AVG(FTAG), 2) AS AvgAwayGoals,
+    ROUND(AVG(FTHG) - AVG(FTAG), 2) AS GoalAdvantage,
+    ROUND((AVG(FTHG) - AVG(FTAG)) / AVG(FTAG) * 100, 2) AS PctMoreGoalsAtHome
+FROM matches;
+
+--==HOME ADVANTAGE BY TEAM(SORTED BY BIGGEST GAP)============================
+WITH home_record AS (
+    SELECT 
+        HomeTeam AS Team,
+        COUNT(*) AS HomeMatches,
+        SUM(CASE WHEN FTR = 'H' THEN 1 ELSE 0 END) AS HomeWins
+    FROM matches
+    GROUP BY HomeTeam
+),
+away_record AS (
+    SELECT 
+        AwayTeam AS Team,
+        COUNT(*) AS AwayMatches,
+        SUM(CASE WHEN FTR = 'A' THEN 1 ELSE 0 END) AS AwayWins
+    FROM matches
+    GROUP BY AwayTeam
+)
+SELECT 
+    h.Team,
+    h.HomeMatches,
+    h.HomeWins,
+    ROUND(h.HomeWins * 100.0 / h.HomeMatches, 2) AS HomeWinPct,
+    a.AwayMatches,
+    a.AwayWins,
+    ROUND(a.AwayWins * 100.0 / a.AwayMatches, 2) AS AwayWinPct,
+    ROUND((h.HomeWins * 100.0 / h.HomeMatches) - (a.AwayWins * 100.0 / a.AwayMatches), 2) AS HomeAdvantageGap
+FROM home_record h
+JOIN away_record a ON h.Team = a.Team
+ORDER BY HomeAdvantageGap DESC;
+
+--==HOME ADVANTAGE BY YEAR (THE COVID STORY)===============
+WITH yearly_stats AS (
+    SELECT 
+        SUBSTR(Date, 7, 2) AS YearCode,
+        COUNT(*) AS Matches,
+        SUM(CASE WHEN FTR = 'H' THEN 1 ELSE 0 END) AS HomeWins,
+        SUM(CASE WHEN FTR = 'A' THEN 1 ELSE 0 END) AS AwayWins
+    FROM matches
+    GROUP BY YearCode
+)
+SELECT 
+    '20' || YearCode AS Year,
+    Matches,
+    HomeWins,
+    AwayWins,
+    ROUND(HomeWins * 100.0 / Matches, 2) AS HomeWinPct,
+    ROUND(AwayWins * 100.0 / Matches, 2) AS AwayWinPct,
+    ROUND((HomeWins - AwayWins) * 100.0 / Matches, 2) AS HomeAdvantageGap
+FROM yearly_stats
+WHERE YearCode IN ('18', '19', '20', '21', '22', '23', '24', '25')
+ORDER BY Year;
+
+--======TOTAL GOALS SCORED BY EACH TEAM (2018-2025)=============
+WITH team_goals AS (
+    SELECT 
+        HomeTeam AS Team,
+        SUM(FTHG) AS GoalsScored,
+        SUM(FTAG) AS GoalsConceded,
+        COUNT(*) AS MatchesPlayed
+    FROM matches
+    GROUP BY HomeTeam
+    UNION ALL
+    SELECT 
+        AwayTeam AS Team,
+        SUM(FTAG) AS GoalsScored,
+        SUM(FTHG) AS GoalsConceded,
+        COUNT(*) AS MatchesPlayed
+    FROM matches
+    GROUP BY AwayTeam
+)
+SELECT 
+    Team,
+    SUM(MatchesPlayed) AS TotalMatches,
+    SUM(GoalsScored) AS TotalGoals,
+    SUM(GoalsConceded) AS TotalConceded,
+    SUM(GoalsScored) - SUM(GoalsConceded) AS GoalDifference,
+    ROUND(SUM(GoalsScored) * 1.0 / SUM(MatchesPlayed), 2) AS GoalsPerMatch
+FROM team_goals
+GROUP BY Team
+ORDER BY TotalGoals DESC;
+
+--==GOALS SCORED BY SEASON (TOP 6 TEAMS ONLY)=================
+WITH all_team_goals AS (
+    SELECT 
+        SUBSTR(Date, 7, 4) AS Year,
+        HomeTeam AS Team,
+        FTHG AS GoalsScored
+    FROM matches
+    UNION ALL
+    SELECT 
+        SUBSTR(Date, 7, 4) AS Year,
+        AwayTeam AS Team,
+        FTAG AS GoalsScored
+    FROM matches
+),
+team_yearly_goals AS (
+    SELECT 
+        Team,
+        Year,
+        SUM(GoalsScored) AS YearGoals
+    FROM all_team_goals
+    GROUP BY Team, Year
+)
+SELECT 
+    Team,
+    SUM(CASE WHEN Year = '2018' THEN YearGoals ELSE 0 END) AS Goals_2018,
+    SUM(CASE WHEN Year = '2019' THEN YearGoals ELSE 0 END) AS Goals_2019,
+    SUM(CASE WHEN Year = '2020' THEN YearGoals ELSE 0 END) AS Goals_2020,
+    SUM(CASE WHEN Year = '2021' THEN YearGoals ELSE 0 END) AS Goals_2021,
+    SUM(CASE WHEN Year = '2022' THEN YearGoals ELSE 0 END) AS Goals_2022,
+    SUM(CASE WHEN Year = '2023' THEN YearGoals ELSE 0 END) AS Goals_2023,
+    SUM(CASE WHEN Year = '2024' THEN YearGoals ELSE 0 END) AS Goals_2024,
+    SUM(CASE WHEN Year = '2025' THEN YearGoals ELSE 0 END) AS Goals_2025,
+    SUM(YearGoals) AS Total
+FROM team_yearly_goals
+WHERE Team IN ('Man City', 'Liverpool', 'Chelsea', 'Arsenal', 'Man United', 'Tottenham')
+GROUP BY Team
+ORDER BY Total DESC;
+
+--====GOALS SCORED VS FINAL LEAGUE POSITION (2024-25)==========================
+WITH season_matches AS (
+    SELECT *
+    FROM matches
+    WHERE 
+        (SUBSTR(Date, 7, 4) = '2024' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) >= 8)
+        OR
+        (SUBSTR(Date, 7, 4) = '2025' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) <= 5)
+),
+team_results AS (
+    SELECT 
+        HomeTeam AS Team,
+        FTHG AS GoalsFor,
+        FTAG AS GoalsAgainst,
+        CASE WHEN FTR = 'H' THEN 3 WHEN FTR = 'D' THEN 1 ELSE 0 END AS Points
+    FROM season_matches
+    UNION ALL
+    SELECT 
+        AwayTeam AS Team,
+        FTAG AS GoalsFor,
+        FTHG AS GoalsAgainst,
+        CASE WHEN FTR = 'A' THEN 3 WHEN FTR = 'D' THEN 1 ELSE 0 END AS Points
+    FROM season_matches
+),
+team_summary AS (
+    SELECT 
+        Team,
+        SUM(GoalsFor) AS GoalsScored,
+        SUM(GoalsAgainst) AS GoalsConceded,
+        SUM(Points) AS Points
+    FROM team_results
+    GROUP BY Team
+)
+SELECT 
+    ROW_NUMBER() OVER (ORDER BY Points DESC, (GoalsScored - GoalsConceded) DESC) AS LeaguePosition,
+    Team,
+    Points,
+    GoalsScored,
+    GoalsConceded,
+    GoalsScored - GoalsConceded AS GoalDifference,
+    RANK() OVER (ORDER BY GoalsScored DESC) AS ScoringRank
+FROM team_summary
+ORDER BY LeaguePosition;
+
+--==AVERAGE GOALS PER MATCH ACROSS ALL SEASONS==
+SELECT 
+    '20' || SUBSTR(Date, 7, 2) AS Year,
+    COUNT(*) AS Matches,
+    ROUND(AVG(FTHG + FTAG), 2) AS AvgGoalsPerMatch,
+    ROUND(AVG(FTHG), 2) AS AvgHomeGoals,
+    ROUND(AVG(FTAG), 2) AS AvgAwayGoals
+FROM matches
+GROUP BY Year
+ORDER BY Year;
+
+--==BIGGEST GOAL-MARGIN WINS BY LOWER TEAMS OVER BIG 6=====
+WITH match_results AS (
+    SELECT 
+        Date,
+        HomeTeam,
+        AwayTeam,
+        FTHG AS HomeGoals,
+        FTAG AS AwayGoals,
+        ABS(FTHG - FTAG) AS GoalMargin,
+        CASE WHEN FTR = 'H' THEN HomeTeam WHEN FTR = 'A' THEN AwayTeam ELSE 'Draw' END AS Winner,
+        CASE WHEN FTR = 'H' THEN AwayTeam WHEN FTR = 'A' THEN HomeTeam ELSE 'Draw' END AS Loser
+    FROM matches
+)
+SELECT 
+    Date,
+    HomeTeam || ' ' || HomeGoals || ' - ' || AwayGoals || ' ' || AwayTeam AS MatchResult,
+    Winner,
+    Loser,
+    GoalMargin
+FROM match_results
+WHERE 
+    Loser IN ('Man City', 'Liverpool', 'Chelsea', 'Arsenal', 'Man United', 'Tottenham')
+    AND Winner NOT IN ('Man City', 'Liverpool', 'Chelsea', 'Arsenal', 'Man United', 'Tottenham')
+    AND GoalMargin >= 3
+ORDER BY GoalMargin DESC, Date DESC
+LIMIT 20;
+
+--==MATCHES WHERE SOMEONE BEAT THE EVENTUAL CHAMPIONS (2024-25)--
+WITH season_matches AS (
+    SELECT *
+    FROM matches
+    WHERE 
+        (SUBSTR(Date, 7, 4) = '2024' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) >= 8)
+        OR
+        (SUBSTR(Date, 7, 4) = '2025' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) <= 5)
+)
+SELECT 
+    Date,
+    HomeTeam,
+    AwayTeam,
+    FTHG,
+    FTAG,
+    CASE WHEN FTR = 'H' THEN HomeTeam WHEN FTR = 'A' THEN AwayTeam END AS WonAgainstCity
+FROM season_matches
+WHERE 
+    (HomeTeam = 'Man City' AND FTR = 'A') 
+    OR
+    (AwayTeam = 'Man City' AND FTR = 'H') 
+ORDER BY Date;
+
+--==HIGHEST-SCORING MATCHES OF ALL TIME (TOP 10)========================
+SELECT 
+    Date,
+    HomeTeam,
+    FTHG AS HomeGoals,
+    FTAG AS AwayGoals,
+    AwayTeam,
+    FTHG + FTAG AS TotalGoals,
+    CASE 
+        WHEN FTHG > FTAG THEN HomeTeam || ' WIN ' || FTHG || '-' || FTAG
+        WHEN FTAG > FTHG THEN AwayTeam || ' WIN ' || FTAG || '-' || FTHG || ' AWAY'
+        ELSE 'DRAW ' || FTHG || '-' || FTAG
+    END AS Story
+FROM matches
+ORDER BY TotalGoals DESC, FTHG + FTAG DESC
+LIMIT 10;
+
+--=BIGGEST BETTING UPSETS (IF ODDS DATA EXISTS)============
+SELECT 
+    Date,
+    HomeTeam,
+    FTHG,
+    FTAG,
+    AwayTeam,
+    CASE WHEN FTR = 'H' THEN B365H WHEN FTR = 'A' THEN B365A END AS WinningOdds,
+    CASE WHEN FTR = 'H' THEN 'HOME UPSET' WHEN FTR = 'A' THEN 'AWAY UPSET' END AS UpsetType
+FROM matches
+WHERE 
+    (FTR = 'H' AND B365H > 4.0)
+    OR
+    (FTR = 'A' AND B365A > 4.0)
+ORDER BY 
+    CASE WHEN FTR = 'H' THEN B365H ELSE B365A END DESC
+LIMIT 20;
+
+--==BIG 6 VS BIG 6 SUMMARY===================================================
+WITH big6 AS (
+    SELECT 'Man City' AS Team UNION SELECT 'Liverpool' UNION SELECT 'Chelsea'
+    UNION SELECT 'Arsenal' UNION SELECT 'Man United' UNION SELECT 'Tottenham'
+),
+big6_matches AS (
+    SELECT * FROM matches
+    WHERE HomeTeam IN (SELECT Team FROM big6) AND AwayTeam IN (SELECT Team FROM big6)
+),
+team_results AS (
+    SELECT 
+        HomeTeam AS Team,
+        CASE WHEN FTR = 'H' THEN 1 ELSE 0 END AS Won,
+        CASE WHEN FTR = 'D' THEN 1 ELSE 0 END AS Drawn,
+        CASE WHEN FTR = 'A' THEN 1 ELSE 0 END AS Lost,
+        FTHG AS GoalsFor,
+        FTAG AS GoalsAgainst
+    FROM big6_matches
+    UNION ALL
+    SELECT 
+        AwayTeam AS Team,
+        CASE WHEN FTR = 'A' THEN 1 ELSE 0 END AS Won,
+        CASE WHEN FTR = 'D' THEN 1 ELSE 0 END AS Drawn,
+        CASE WHEN FTR = 'H' THEN 1 ELSE 0 END AS Lost,
+        FTAG AS GoalsFor,
+        FTHG AS GoalsAgainst
+    FROM big6_matches
+)
+SELECT 
+    Team,
+    COUNT(*) AS MatchesPlayed,
+    SUM(Won) AS Wins,
+    SUM(Drawn) AS Draws,
+    SUM(Lost) AS Losses,
+    SUM(GoalsFor) AS GF,
+    SUM(GoalsAgainst) AS GA,
+    SUM(GoalsFor) - SUM(GoalsAgainst) AS GD,
+    (SUM(Won) * 3) + SUM(Drawn) AS Points,
+    ROUND(SUM(Won) * 100.0 / COUNT(*), 2) AS WinPct
+FROM team_results
+GROUP BY Team
+ORDER BY Points DESC;
+
+--==BIG 6 TEAM RECORDS AGAINST SPECIFIC RIVALS===============
+WITH big6 AS (
+    SELECT 'Man City' AS Team UNION SELECT 'Liverpool' UNION SELECT 'Chelsea'
+    UNION SELECT 'Arsenal' UNION SELECT 'Man United' UNION SELECT 'Tottenham'
+),
+matchups AS (
+    SELECT 
+        HomeTeam AS TeamA,
+        AwayTeam AS TeamB,
+        CASE WHEN FTR = 'H' THEN 'WIN' WHEN FTR = 'D' THEN 'DRAW' ELSE 'LOSS' END AS Result_TeamA
+    FROM matches
+    WHERE HomeTeam IN (SELECT Team FROM big6) AND AwayTeam IN (SELECT Team FROM big6)
+)
+SELECT 
+    TeamA AS Team,
+    TeamB AS Opponent,
+    COUNT(*) AS Played,
+    SUM(CASE WHEN Result_TeamA = 'WIN' THEN 1 ELSE 0 END) AS Wins,
+    SUM(CASE WHEN Result_TeamA = 'DRAW' THEN 1 ELSE 0 END) AS Draws,
+    SUM(CASE WHEN Result_TeamA = 'LOSS' THEN 1 ELSE 0 END) AS Losses
+FROM matchups
+GROUP BY TeamA, TeamB
+ORDER BY TeamA, TeamB;
+
+--==FIND EACH TEAM'S LONGEST WINNING STREAK================
+WITH team_match_results AS (
+    SELECT 
+        HomeTeam AS Team, 
+        -- Convert DD/MM/YYYY to YYYY-MM-DD for chronological sorting
+        SUBSTR(Date, 7, 4) || '-' || SUBSTR(Date, 4, 2) || '-' || SUBSTR(Date, 1, 2) AS FormattedDate,
+        CASE WHEN FTR = 'H' THEN 'W' ELSE 'X' END AS Result 
+    FROM matches
+    UNION ALL
+    SELECT 
+        AwayTeam AS Team, 
+        SUBSTR(Date, 7, 4) || '-' || SUBSTR(Date, 4, 2) || '-' || SUBSTR(Date, 1, 2) AS FormattedDate,
+        CASE WHEN FTR = 'A' THEN 'W' ELSE 'X' END AS Result 
+    FROM matches
+),
+with_row_numbers AS (
+    SELECT 
+        Team, FormattedDate, Result,
+        -- Now ordering chronologically works perfectly
+        ROW_NUMBER() OVER (PARTITION BY Team ORDER BY FormattedDate) AS MatchNum,
+        ROW_NUMBER() OVER (PARTITION BY Team, Result ORDER BY FormattedDate) AS ResultNum
+    FROM team_match_results
+),
+streak_groups AS (
+    SELECT 
+        Team, FormattedDate, Result, MatchNum,
+        MatchNum - ResultNum AS StreakGroup
+    FROM with_row_numbers
+    WHERE Result = 'W'
+),
+streak_lengths AS (
+    SELECT 
+        Team, StreakGroup,
+        COUNT(*) AS StreakLength,
+        MIN(FormattedDate) AS StreakStart,
+        MAX(FormattedDate) AS StreakEnd
+    FROM streak_groups
+    GROUP BY Team, StreakGroup
+)
+SELECT 
+    Team,
+    StreakLength AS LongestWinStreak,
+    StreakStart,
+    StreakEnd
+FROM streak_lengths
+WHERE StreakLength = (
+    SELECT MAX(StreakLength)
+    FROM streak_lengths sl2
+    WHERE sl2.Team = streak_lengths.Team
+)
+ORDER BY StreakLength DESC;
+
+--==TEAM CONSISTENCY ANALYSIS (BOSS QUERY)==============
+WITH season_assignment AS (
+    SELECT 
+        *,
+        CASE 
+            WHEN SUBSTR(Date, 7, 4) = '2018' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) >= 8 THEN '2018-19'
+            WHEN SUBSTR(Date, 7, 4) = '2019' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) <= 7 THEN '2018-19'
+            WHEN SUBSTR(Date, 7, 4) = '2019' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) >= 8 THEN '2019-20'
+            WHEN SUBSTR(Date, 7, 4) = '2020' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) <= 7 THEN '2019-20'
+            WHEN SUBSTR(Date, 7, 4) = '2020' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) >= 8 THEN '2020-21'
+            WHEN SUBSTR(Date, 7, 4) = '2021' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) <= 7 THEN '2020-21'
+            WHEN SUBSTR(Date, 7, 4) = '2021' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) >= 8 THEN '2021-22'
+            WHEN SUBSTR(Date, 7, 4) = '2022' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) <= 7 THEN '2021-22'
+            WHEN SUBSTR(Date, 7, 4) = '2022' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) >= 8 THEN '2022-23'
+            WHEN SUBSTR(Date, 7, 4) = '2023' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) <= 7 THEN '2022-23'
+            WHEN SUBSTR(Date, 7, 4) = '2023' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) >= 8 THEN '2023-24'
+            WHEN SUBSTR(Date, 7, 4) = '2024' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) <= 7 THEN '2023-24'
+            WHEN SUBSTR(Date, 7, 4) = '2025' AND CAST(SUBSTR(Date, 4, 2) AS INTEGER) <= 8 THEN '2024-25'
+        END AS Season
+    FROM matches
+),
+team_season_results AS (
+    SELECT HomeTeam AS Team, Season, CASE WHEN FTR = 'H' THEN 3 WHEN FTR = 'D' THEN 1 ELSE 0 END AS Points FROM season_assignment
+    UNION ALL
+    SELECT AwayTeam AS Team, Season, CASE WHEN FTR = 'A' THEN 3 WHEN FTR = 'D' THEN 1 ELSE 0 END AS Points FROM season_assignment
+),
+season_standings AS (
+    SELECT 
+        Team, Season,
+        SUM(Points) AS SeasonPoints,
+        RANK() OVER (PARTITION BY Season ORDER BY SUM(Points) DESC) AS FinalPosition
+    FROM team_season_results
+    WHERE Season IS NOT NULL
+    GROUP BY Team, Season
+),
+team_consistency AS (
+    SELECT 
+        Team,
+        COUNT(*) AS SeasonsPlayed,
+        ROUND(AVG(FinalPosition), 2) AS AvgPosition,
+        MIN(FinalPosition) AS BestFinish,
+        MAX(FinalPosition) AS WorstFinish,
+        MAX(FinalPosition) - MIN(FinalPosition) AS PositionRange,
+        ROUND(AVG(SeasonPoints), 2) AS AvgPoints
+    FROM season_standings
+    GROUP BY Team
+)
+SELECT 
+    Team,
+    SeasonsPlayed,
+    AvgPosition,
+    BestFinish,
+    WorstFinish,
+    PositionRange AS Volatility,
+    AvgPoints,
+    CASE 
+        WHEN PositionRange <= 4 AND AvgPosition <= 8 THEN 'Consistent Top'
+        WHEN PositionRange <= 4 AND AvgPosition >= 12 THEN 'Consistent Bottom'
+        WHEN PositionRange > 10 THEN 'Highly Volatile'
+        WHEN PositionRange > 7 THEN 'Moderately Volatile'
+        ELSE 'Stable Mid-Table'
+    END AS ConsistencyCategory
+FROM team_consistency
+WHERE SeasonsPlayed >= 3 
+ORDER BY AvgPosition;

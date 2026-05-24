@@ -1,0 +1,24 @@
+"Team","SeasonsPlayed","AvgPosition","BestFinish","WorstFinish","Volatility","AvgPoints","ConsistencyCategory"
+Man City,7,1.14,1,2,1,82.57,Consistent Top
+Liverpool,7,2.57,1,5,4,77.86,Consistent Top
+Arsenal,7,4.71,2,8,6,66.71,Stable Mid-Table
+Chelsea,7,5.14,3,12,9,60.0,Moderately Volatile
+Man United,7,6.0,2,15,13,59.86,Highly Volatile
+Tottenham,7,7.29,4,17,13,57.57,Highly Volatile
+Newcastle,7,9.29,4,13,9,49.71,Moderately Volatile
+Aston Villa,6,9.5,4,17,13,50.17,Highly Volatile
+Leicester,6,10.5,5,18,13,46.17,Highly Volatile
+Wolves,7,10.57,6,15,9,46.43,Moderately Volatile
+West Ham,7,10.86,6,16,10,46.29,Moderately Volatile
+Brighton,7,11.29,5,17,12,44.71,Highly Volatile
+Crystal Palace,7,11.57,8,14,6,44.43,Stable Mid-Table
+Brentford,4,11.75,9,16,7,44.0,Stable Mid-Table
+Everton,7,11.86,8,17,9,45.14,Moderately Volatile
+Bournemouth,5,13.8,11,18,7,38.4,Stable Mid-Table
+Nott'm Forest,3,14.67,11,17,6,34.0,Stable Mid-Table
+Fulham,5,15.0,10,19,9,35.6,Moderately Volatile
+Leeds,3,15.0,9,19,10,42.67,Moderately Volatile
+Burnley,5,15.6,9,19,10,38.4,Moderately Volatile
+Watford,3,16.0,11,19,8,35.67,Moderately Volatile
+Southampton,6,16.17,11,20,9,34.17,Moderately Volatile
+Sheffield United,3,16.33,9,20,11,31.0,Highly Volatile

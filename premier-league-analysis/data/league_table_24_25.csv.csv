@@ -1,0 +1,21 @@
+"LeaguePosition","Team","Points","GoalsScored","GoalsConceded","GoalDifference","ScoringRank"
+1,Liverpool,84,86,41,45,1
+2,Arsenal,74,69,34,35,3
+3,Man City,71,72,44,28,2
+4,Chelsea,69,64,43,21,7
+5,Newcastle,66,68,47,21,4
+6,Aston Villa,66,58,51,7,9
+7,Nott'm Forest,65,58,46,12,9
+8,Brighton,61,66,59,7,5
+9,Bournemouth,56,58,46,12,9
+10,Brentford,56,66,57,9,5
+11,Fulham,54,54,54,0,12
+12,Crystal Palace,53,51,51,0,14
+13,Everton,48,42,44,-2,17
+14,West Ham,43,46,62,-16,15
+15,Man United,42,44,54,-10,16
+16,Wolves,42,54,69,-15,12
+17,Tottenham,38,64,65,-1,7
+18,Leicester,25,33,80,-47,19
+19,Ipswich,22,36,82,-46,18
+20,Southampton,12,26,86,-60,20
